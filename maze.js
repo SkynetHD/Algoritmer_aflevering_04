@@ -130,10 +130,37 @@ class Cell {
     connectedNeighbors(grid) {
         let neighbors = [];
 
-        // TODO: Tjek om naboen nord for, hvis den findes, har en væg
-        // TODO: Tjek om naboen til venstre, hvis den findes, har en væg
-        // TODO: Tjek om naboen syd for, hvis den findes, har en væg
-        // TODO: Tjek om naboen til højre, hvis den findes, har en væg
+        // Tjek om naboen nord for, hvis den findes, har en væg
+        if (this.y > 0 && !this.walls.top) {
+            const north_x = this.x;
+            const north_y = this.y - 1;
+            const north_neighbor = grid[north_x][north_y];
+            neighbors.push(north_neighbor);
+        }
+
+        // Tjek om naboen til venstre, hvis den findes, har en væg
+        if (this.x > 0 && !this.walls.left) {
+            const west_x = this.x - 1;
+            const west_y = this.y;
+            const west_neighbor = grid[west_x][west_y];
+            neighbors.push(west_neighbor);
+        }
+
+        // Tjek om naboen syd for, hvis den findes, har en væg
+        if (this.y < grid[0].length - 1 && !this.walls.bottom) {
+            const south_x = this.x;
+            const south_y = this.y + 1;
+            const south_neighbor = grid[south_x][south_y];
+            neighbors.push(south_neighbor);
+        }
+
+        // Tjek om naboen til højre, hvis den findes, har en væg
+        if (this.x < grid.length - 1 && !this.walls.right) {
+            const east_x = this.x + 1;
+            const east_y = this.y;
+            const east_neighbor = grid[east_x][east_y];
+            neighbors.push(east_neighbor);
+        }
 
         return neighbors;
     }
@@ -143,14 +170,12 @@ class Cell {
         return this.x === otherCell.x && this.y === otherCell.y;
     }
 
-    // Hjælpefunktion til MazeSolver: Fremhæver cellen som en del af stien
-    drawPath(ctx, cellWidth, color = '#ff0000') {
-        // TODO: Personliggør denne funktion.
-        ctx.fillStyle = color;
-        const px = this.x * cellWidth + cellWidth * 0.25;
-        const py = this.y * cellWidth + cellWidth * 0.25;
-        const size = cellWidth * 0.5;
-        ctx.fillRect(px, py, size, size);
+    // Hjælpefunktion til MazeSolver: Returnerer centrum af cellen
+    getCenter(cellWidth) {
+        return {
+            x: this.x * cellWidth + cellWidth / 2,
+            y: this.y * cellWidth + cellWidth / 2
+        };
     }
 }
 
@@ -235,7 +260,29 @@ class MazeSolver {
         const startCell = this.maze.grid[startX][startY];
         const endCell = this.maze.grid[endX][endY];
 
-        // TODO: Lav `findPath()` vha. enten DFS (stak) eller BFS (queue)
+        // BFS
+        const queue = [];
+        queue.push(startCell);
+        startCell.visited = true;
+
+        while (queue.length > 0) {
+            const currentCell = queue.shift();
+
+            if (currentCell.equals(endCell)) {
+                return this.reconstructPath(startCell, endCell);
+            }
+
+            // Find alle naboer uden væg
+            const neighbors = currentCell.connectedNeighbors(this.maze.grid);
+
+            for (const neighbor of neighbors) {
+                if (!neighbor.visited) {
+                    neighbor.visited = true;
+                    neighbor.parent = currentCell;
+                    queue.push(neighbor);
+                }
+            }
+        }
 
         return null;
     }
@@ -252,19 +299,52 @@ class MazeSolver {
         return path.length > 0 && path[0].equals(startCell) ? path : null;
     }
 
-    drawPath(path, color = '#ff0000') {
-        if (!path) return;
+    drawPath(path, color = '#9b59b6') {
+        if (!path || path.length < 2) return;
 
-        for (const cell of path) {
-            cell.drawPath(this.maze.ctx, this.maze.cellWidth, color);
+        const ctx = this.maze.ctx;
+        const cellWidth = this.maze.cellWidth;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+
+        // Start ved første celle
+        const firstCenter = path[0].getCenter(cellWidth);
+        ctx.moveTo(firstCenter.x, firstCenter.y);
+
+        // Tegn linje gennem alle celler
+        for (let i = 1; i < path.length; i++) {
+            const center = path[i].getCenter(cellWidth);
+            ctx.lineTo(center.x, center.y);
         }
+
+        ctx.stroke();
     }
 
-    async drawPathStepwise(path, color = '#ff0000', delay = 100) {
-        if (!path) return;
+    async drawPathStepwise(path, color = '#9b59b6', delay = 100) {
+        if (!path || path.length < 2) return;
 
-        for (const cell of path) {
-            cell.drawPath(this.maze.ctx, this.maze.cellWidth, color);
+        const ctx = this.maze.ctx;
+        const cellWidth = this.maze.cellWidth;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Start ved første celle
+        const firstCenter = path[0].getCenter(cellWidth);
+        ctx.beginPath();
+        ctx.moveTo(firstCenter.x, firstCenter.y);
+
+        // Tegn linje gradvist gennem hver celle
+        for (let i = 1; i < path.length; i++) {
+            const center = path[i].getCenter(cellWidth);
+            ctx.lineTo(center.x, center.y);
+            ctx.stroke();
             await this.sleep(delay);
         }
     }
@@ -289,8 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const endX = maze.cols - 1;
     const endY = maze.rows - 1;
 
-    solver.findPath(startX, startY, endX, endY);
-    solver.drawPathStepwise(path, '#ff0000', 20);
+    const path = solver.findPath(startX, startY, endX, endY);
+    solver.drawPathStepwise(path, '#9b59b6', 20);
 
     console.log(maze);
 })
